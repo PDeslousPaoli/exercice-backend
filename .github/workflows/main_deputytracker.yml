@@ -46,4 +46,4 @@ jobs:
           app-name: 'deputyTracker'
           slot-name: 'Production'
           package: .
-          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_0F659E104BE4476CB5F9DC219C627087 }}
+          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_462C7D9BC00344C983693D7A4D744E14 }}
