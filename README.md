@@ -57,9 +57,12 @@ Ingest and persist deputy vote mappings
 **Flow**:
 
 Request hits DepsearchResolver.depute which orchestrates the domain flow.
+
 Resolver calls VotesDeputesService.createPayload — votes-deputes.service.ts.
+
 Inside the service:
 The deputy is fetched via DeputeRepository.findDeputeByName — deputes.repository.ts. If not found, it throws DeputeNotFoundError — depsearch.errors.ts.
+
 Votes involving the deputy are fetched via VoteRepository.findVotesByDeputeName — votes.repository.ts. If none are returned, the service throws VotesNotFoundError — depsearch.errors.ts.
 For each vote, the service computes:
 Normalized deputy name: normalizeName (removes accents, spaces, hyphens, lowercases). See VotesDeputesService.normalizeName — votes-deputes.service.ts.
