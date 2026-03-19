@@ -30,7 +30,9 @@ let DeputeRepository = class DeputeRepository {
             });
         }
         catch (error) {
-            throw new common_1.InternalServerErrorException("Database error", error);
+            throw new common_1.InternalServerErrorException("Database error", {
+                cause: error,
+            });
         }
     }
 };

@@ -16,10 +16,11 @@ async function bootstrap() {
         methods: ["GET", "POST", "OPTIONS"],
         allowedHeaders: ["Content-Type", "Authorization"],
     });
-    app.use((req, res, next) => {
+    const logger = (req, res, next) => {
         console.log("➡️ Incoming request:", req.method, req.url);
         next();
-    });
+    };
+    app.use(logger);
     app.useGlobalFilters(new global_exception_filter_1.GlobalExceptionFilter());
     const port = process.env.PORT || 3000;
     await app.listen(port);
