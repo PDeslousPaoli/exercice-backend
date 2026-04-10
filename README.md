@@ -12,25 +12,39 @@ pnpm
 
 Install pnpm if needed:
 
+```bash
 npm install -g pnpm
+```
 
 **Installation**
 
 Install dependencies:
 
+```bash
 pnpm install
+```
 
 **Build**
 
 Compile the project:
 
+```bash
 pnpm build
+```
 
 **Run the application**
 
 Start the development server:
 
+```bash
 pnpm run start:dev
+```
+
+**Access the API**
+
+Once running, access:
+
+GraphQL Playground:http://localhost:3000/graphql
 
 **System Vision**
 
