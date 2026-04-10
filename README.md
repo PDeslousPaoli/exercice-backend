@@ -1,83 +1,179 @@
-# exercice-backend
-This repository contains the backend service for deputyTracker, built with Node.js + TypeScript and follows a Hexagonal Architecture. The API is GraphQL (code-first, auto-generated schema) and persistence is handled by Sequelize connected to a managed Aiven PostgreSQL instance.
+**Functional Specs & Architecture (DeputyTracker Backend)**
 
-Key workspace entry points:
+This document describes the business logic, hexagonal architecture, and data flow of the DeputyTracker backend.
 
-Core service that builds payloads: VotesDeputesService — votes-deputes.service.ts
-GraphQL resolver (primary adapter): DepsearchResolver — depsearch.resolver.ts
-Database adapters (repositories): DeputeRepository, VoteRepository, VotesDeputesRepository
+**System Vision**
 
-**Core / Domain**
-Business logic is implemented inside domain services.
-Domain errors are declared here: DeputeNotFoundError, VotesNotFoundError — depsearch.errors.ts.
+The goal is to map parliamentary votes to deputies to provide a structured and queryable view of voting behavior.
 
-**Ports**
-Outbound port for votes-deputes use-case: IVotesDeputesService — votes-deputes.port.ts.
-Outbound port for votes repository: IVoteRepository — vote.port.ts.
+| Concept     | Technical Meaning                         |
+| :---------- | :---------------------------------------- |
+| **Deputy**  | Main domain entity being queried          |
+| **Vote**    | Raw data containing arrays of voters      |
+| **Mapping** | Computed join between `deputy` and `vote` |
+| **Payload** | Structured result exposed via GraphQL     |
 
-**Adapters**
-Primary (driving) adapters: GraphQL resolvers. Main entry: DepsearchResolver.depute — depsearch.resolver.ts.
-Secondary (driven) adapters: Sequelize repositories implementing ports:
-DeputeRepository — deputes.repository.ts
-VoteRepository — votes.repository.ts
-VotesDeputesRepository — votes-deputes.repository.ts
-Sequelize models (DB schema mapping): Votes_deputes, Votes, Deputes — votes-deputes.model.ts, votes.model.ts, deputes.model.ts.
+**Hexagonal Architecture**
 
-**Tech Stack**
-Runtime: Node.js + TypeScript
-API: GraphQL (code-first via NestJS GraphQLModule; schema output: schema/schema.gql)
-ORM: Sequelize (sequelize-typescript models)
-Database: PostgreSQL (Aiven-managed)
-CI/CD: GitHub Actions (workflow present in .github/workflows) and targeted deployment to Azure App Service (pipeline configured in repository).
+The project follows a Ports & Adapters (Hexagonal) architecture.
 
-**Local Setup & Installation**
-**Prerequisites**
+flowchart LR
+    A[GraphQL Resolver] --> B[Domain Service]
+    B --> C[Ports]
+    C --> D[Repositories]
+    D --> E[(PostgreSQL)]
 
-Node.js (v20+ recommended)
-pnpm (npm install -g pnpm)
-Clone and install
-Environment (example .env entries)
-Database (Aiven SSL): set connection variables used in database.config.ts and sequelize.config.js. Typical variables:
-DATABASE_HOST, DATABASE_PORT, DATABASE_USER, DATABASE_PASSWORD, DATABASE_NAME
-Server: PORT=3000
-Launch
+    | Layer             | Role                           |
+| :---------------- | :----------------------------- |
+| **Core / Domain** | Pure business logic            |
+| **Ports**         | Interfaces (contracts)         |
+| **Adapters**      | Implementations (GraphQL + DB) |
 
-**API Documentation (GraphQL)**
-Schema is auto-generated from the code-first GraphQL types and resolvers and written to schema.gql.
-The GraphQL server is configured in app.module.ts — see GraphQLModule.forRoot settings and context configuration: app.module.ts.
-Primary GraphQL entry relevant to deputy search:
 
-Resolver: DepsearchResolver.depute — depsearch.resolver.ts
-DTO / GraphQL type returned: VoteDeputeDto — votes-deputes.ts
-Example GraphQL query (use GraphQL Playground at http://localhost:3000/graphql when running):
+**Main Flow (Use Case)**
 
-**Core Functionalities** 
-Ingest and persist deputy vote mappings
+**Deputy vote ingestion**
 
-**Flow**:
+sequenceDiagram
+    participant Client
+    participant Resolver
+    participant Service
+    participant DeputeRepo
+    participant VoteRepo
+    participant DB
 
-Request hits DepsearchResolver.depute which orchestrates the domain flow.
-Resolver calls VotesDeputesService.createPayload — votes-deputes.service.ts.
-Inside the service:
-The deputy is fetched via DeputeRepository.findDeputeByName — deputes.repository.ts. If not found, it throws DeputeNotFoundError — depsearch.errors.ts.
-Votes involving the deputy are fetched via VoteRepository.findVotesByDeputeName — votes.repository.ts. If none are returned, the service throws VotesNotFoundError — depsearch.errors.ts.
-For each vote, the service computes:
-Normalized deputy name: normalizeName (removes accents, spaces, hyphens, lowercases). See VotesDeputesService.normalizeName — votes-deputes.service.ts.
-Vote category: getVoteCategory (checks votants_pour, votants_contre, votants_abstention, non_votants). See VotesDeputesService.getVoteCategory — votes-deputes.service.ts.
-The service maps votes into a payload matching the votes_deputes joint table and calls the Sequelize model bulk insert: this.votesDeputesModel.bulkCreate(...). The model mapping lives in Votes_deputes — votes-deputes.model.ts.
-The service returns the depute id so the resolver can fetch results.
+    Client->>Resolver: depute(name)
+    Resolver->>Service: createPayload(name)
 
-**Persistence details**:
+    Service->>DeputeRepo: findDeputeByName
+    alt Not found
+        Service-->>Resolver: DeputeNotFoundError
+    end
 
-Joint table model: Votes_deputes — votes-deputes.model.ts.
-Migrations that create / enforce constraints on this table: 20250308-create-votes-deputes-joint-table.js and constraint update migration 20250824-make-composite-primary+key-for-vote-deputes-table.js.
-Retrieve deputy vote payload for GraphQL queries
-After ingesting or when requested, DepsearchService.retrievePayload — depsearch.service.ts queries stored mappings via VotesDeputesRepository.findAllDeputeVotes — votes-deputes.repository.ts.
-If no stored votes exist for the deputy id, the service throws a NestJS NotFoundException to the resolver layer.
-Other relevant parts
+    Service->>VoteRepo: findVotesByDeputeName
+    alt No votes
+        Service-->>Resolver: VotesNotFoundError
+    end
 
-Vote model and arrays fields (postgres TEXT[] mapping): Votes — votes.model.ts. This model exposes arrays such as votants_pour, votants_contre, votants_abstention, and non_votants, and is used by the repository query in VoteRepository.findVotesByDeputeName — votes.repository.ts.
-Unit tests that document expected behavior of the service: votes-deputes.service.spec.ts.
+    loop each vote
+        Service->>Service: normalizeName()
+        Service->>Service: getVoteCategory()
+    end
 
-**Deployment**
-CI/CD pipeline is configured under main_deputytracker.yml. Pushes to main trigger install/build/deploy steps targeting Azure App Service. See package.json for available scripts used by the pipeline.
+    Service->>DB: bulkCreate(votes_deputes)
+    Service-->>Resolver: deputeId
+
+    **Core Business Logic**
+A. **Name Normalization (normalizeName)**
+
+| Goal                    | Implementation             |
+| :---------------------- | :------------------------- |
+| Standardize comparisons | lowercase + remove accents |
+| Avoid mismatches        | remove spaces and hyphens  |
+
+**B. Vote Category (getVoteCategory)**
+
+| Field Checked        | Result     |
+| :------------------- | :--------- |
+| `votants_pour`       | POUR       |
+| `votants_contre`     | CONTRE     |
+| `votants_abstention` | ABSTENTION |
+| `non_votants`        | NON_VOTANT |
+
+**C. Payload Construction**
+
+| Step      | Description                |
+| :-------- | :------------------------- |
+| Extract   | Fetch votes                |
+| Transform | Normalize + map            |
+| Load      | `bulkCreate` via Sequelize |
+
+**5. Data Model (ERD)**
+
+erDiagram
+    DEPUTES ||--o{ VOTES_DEPUTES : maps
+    VOTES ||--o{ VOTES_DEPUTES : contains
+
+    DEPUTES {
+        int id PK
+        string name
+    }
+
+    VOTES {
+        int id PK
+        string titre
+        text[] votants_pour
+        text[] votants_contre
+        text[] votants_abstention
+        text[] non_votants
+    }
+
+    VOTES_DEPUTES {
+        int depute_id FK
+        int vote_id FK
+        string vote_category
+        string normalized_name
+    }
+
+    **6. GraphQL API**
+    
+**Main Entry Point**
+
+| Resolver                   | Description                |
+| :------------------------- | :------------------------- |
+| `DepsearchResolver.depute` | Search + ingest + retrieve |
+
+
+**Output**
+
+| Type            | Description              |
+| :-------------- | :----------------------- |
+| `VoteDeputeDto` | GraphQL response payload |
+
+
+**7. Data Retrieval**
+
+flowchart TD
+    A[DepsearchService.retrievePayload] --> B[VotesDeputesRepository]
+    B --> C{Data exists?}
+    C -->|No| D[NotFoundException]
+    C -->|Yes| E[Return payload]
+
+    **8. Key Components**
+
+    | Component           | File                       |
+| :------------------ | :------------------------- |
+| VotesDeputesService | `votes-deputes.service.ts` |
+
+
+| Repository             | Role              |
+| :--------------------- | :---------------- |
+| DeputeRepository       | Deputy access     |
+| VoteRepository         | Votes access      |
+| VotesDeputesRepository | Join table access |
+
+
+| Error                 | Condition        |
+| :-------------------- | :--------------- |
+| `DeputeNotFoundError` | Deputy not found |
+| `VotesNotFoundError`  | No votes found   |
+
+
+**9. Persistence & Constraints**
+
+| Element     | Description            |
+| :---------- | :--------------------- |
+| Table       | `votes_deputes`        |
+| Insert      | `bulkCreate`           |
+| Primary Key | Composite              |
+| Migrations  | Creation + constraints |
+
+**10. Tech Stack**
+
+| Layer   | Tech                        |
+| :------ | :-------------------------- |
+| Runtime | Node.js + TypeScript        |
+| API     | GraphQL (NestJS code-first) |
+| ORM     | Sequelize                   |
+| DB      | PostgreSQL (Aiven)          |
+| CI/CD   | GitHub Actions + Azure      |
