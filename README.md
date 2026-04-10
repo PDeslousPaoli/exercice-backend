@@ -17,11 +17,14 @@ The goal is to map parliamentary votes to deputies to provide a structured and q
 
 The project follows a Ports & Adapters (Hexagonal) architecture.
 
+```mermaid
 flowchart LR
     A[GraphQL Resolver] --> B[Domain Service]
     B --> C[Ports]
     C --> D[Repositories]
     D --> E[(PostgreSQL)]
+
+```
 
     | Layer             | Role                           |
 | :---------------- | :----------------------------- |
@@ -33,6 +36,8 @@ flowchart LR
 **Main Flow (Use Case)**
 
 **Deputy vote ingestion**
+
+```mermaid
 
 sequenceDiagram
     participant Client
@@ -63,6 +68,8 @@ sequenceDiagram
     Service->>DB: bulkCreate(votes_deputes)
     Service-->>Resolver: deputeId
 
+```
+
     **Core Business Logic**
 A. **Name Normalization (normalizeName)**
 
@@ -89,7 +96,7 @@ A. **Name Normalization (normalizeName)**
 | Load      | `bulkCreate` via Sequelize |
 
 **5. Data Model (ERD)**
-
+```mermaid
 erDiagram
     DEPUTES ||--o{ VOTES_DEPUTES : maps
     VOTES ||--o{ VOTES_DEPUTES : contains
@@ -114,6 +121,7 @@ erDiagram
         string vote_category
         string normalized_name
     }
+```
 
     **6. GraphQL API**
     
@@ -133,11 +141,13 @@ erDiagram
 
 **7. Data Retrieval**
 
+```mermaid
 flowchart TD
     A[DepsearchService.retrievePayload] --> B[VotesDeputesRepository]
     B --> C{Data exists?}
     C -->|No| D[NotFoundException]
     C -->|Yes| E[Return payload]
+```
 
     **8. Key Components**
 
