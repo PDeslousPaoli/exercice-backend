@@ -26,7 +26,7 @@ flowchart LR
 
 ```
 
-    | Layer             | Role                           |
+| Layer             | Role                           |
 | :---------------- | :----------------------------- |
 | **Core / Domain** | Pure business logic            |
 | **Ports**         | Interfaces (contracts)         |
@@ -151,7 +151,7 @@ flowchart TD
 
     **8. Key Components**
 
-    | Component           | File                       |
+| Component           | File                       |
 | :------------------ | :------------------------- |
 | VotesDeputesService | `votes-deputes.service.ts` |
 
