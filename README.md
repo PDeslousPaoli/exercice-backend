@@ -2,6 +2,36 @@
 
 This document describes the business logic, hexagonal architecture, and data flow of the DeputyTracker backend.
 
+**Local Setup & Run**
+**Prerequisites**
+
+Make sure you have installed:
+
+Node.js (v20+ recommended)
+pnpm
+
+Install pnpm if needed:
+
+npm install -g pnpm
+
+**Installation**
+
+Install dependencies:
+
+pnpm install
+
+**Build**
+
+Compile the project:
+
+pnpm build
+
+**Run the application**
+
+Start the development server:
+
+pnpm run start:dev
+
 **System Vision**
 
 The goal is to map parliamentary votes to deputies to provide a structured and queryable view of voting behavior.
